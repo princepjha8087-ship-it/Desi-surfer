@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Desi Surfer Ultimate</title>
+
+<style>
+body {
+    margin:0;
+    overflow:hidden;
+    background:black;
+    font-family:sans-serif;
+}
+
+/* START SCREEN */
+#start-screen {
+    position:absolute;
+    width:100%;
+    height:100%;
+    background:linear-gradient(#000428,#004e92);
+    display:flex;
+    flex-direction:column;
+    justify-content:center;
+    align-items:center;
+    color:white;
+    z-index:999;
+}
+
+/* GAME */
+#game-container {
+    position:relative;
+    width:400px;
+    height:600px;
+    margin:auto;
+    top:50%;
+    transform:translateY(-50%);
+    overflow:hidden;
+    border-radius:20px;
+    background:url('https://i.imgur.com/3ZQ3Z6D.png') repeat-y;
+    background-size:cover;
+    animation:moveBg 1s linear infinite;
+}
+
+@keyframes moveBg {
+    from {background-position:0 0;}
+    to {background-position:0 600px;}
+}
+
+/* PLAYER */
+#player {
+    position:absolute;
+    width:50px;
+    height:70px;
+    background:url('https://i.imgur.com/6X12R7K.png') no-repeat center/cover;
+    bottom:50px;
+    left:180px;
+}
+
+/* POLICE */
+#police {
+    position:absolute;
+    width:50px;
+    height:70px;
+    background:url('https://i.imgur.com/Z8KpQ9D.png') no-repeat center/cover;
+    bottom:-80px;
+    left:180px;
+    opacity:0.8;
+}
+
+/* OBSTACLE */
+.obstacle {
+    position:absolute;
+    width:60px;
+    height:90px;
+    background:url('https://i.imgur.com/8Qf6R3K.png') no-repeat center/cover;
+}
+
+/* COIN */
+.coin {
+    position:absolute;
+    width:30px;
+    height:30px;
+    background:url('https://i.imgur.com/Wb1qfhK.png') no-repeat center/cover;
+}
+
+/* POWER */
+.power {
+    position:absolute;
+    width:30px;
+    height:30px;
+    background:cyan;
+    border-radius:50%;
+}
+
+/* UI */
+#score,#coins,#high-score {
+    position:absolute;
+    left:10px;
+    color:white;
+}
+#score{top:10px;}
+#coins{top:30px;}
+#high-score{top:50px;}
+
+/* SHOP */
+#shop {
+    position:absolute;
+    right:10px;
+    top:10px;
+}
+
+/* GAME OVER */
+#game-over {
+    position:absolute;
+    top:50%;
+    left:50%;
+    transform:translate(-50%,-50%);
+    background:black;
+    padding:20px;
+    display:none;
+    color:white;
+    text-align:center;
+}
+</style>
+</head>
+
+<body>
+
+<div id="start-screen">
+<h1>🔥 DESI SURFER 🔥</h1>
+<button onclick="startGame()">Start</button>
+</div>
+
+<div id="game-container">
+
+<div id="score">Score: 0</div>
+<div id="coins">Coins: 0</div>
+<div id="high-score">High Score: 0</div>
+
+<div id="player"></div>
+<div id="police"></div>
+
+<div id="shop">
+<button onclick="buySkin('red',10)">Red</button>
+<button onclick="buySkin('green',20)">Green</button>
+</div>
+
+<div id="game-over">
+<h2>GAME OVER</h2>
+<p id="final-score"></p>
+<button onclick="restartGame()">Restart</button>
+</div>
+
+</div>
+
+<script>
+let player=document.getElementById('player');
+let police=document.getElementById('police');
+let container=document.getElementById('game-container');
+
+let lanes=[75,180,285];
+let lane=1;
+
+let score=0,coins=0,speed=5;
+let isGameOver=false,isJump=false,shield=false;
+let policeDist=120;
+
+// start
+function startGame(){
+document.getElementById('start-screen').style.display='none';
+createObstacle();
+createCoin();
+createPower();
+}
+
+// controls
+document.addEventListener('keydown',e=>{
+if(isGameOver) return;
+
+if(e.key==="ArrowLeft"&&lane>0) lane--;
+if(e.key==="ArrowRight"&&lane<2) lane++;
+if(e.key==="ArrowUp"&&!isJump){
+isJump=true;
+player.style.bottom="150px";
+setTimeout(()=>{
+player.style.bottom="50px";
+isJump=false;
+},400);
+}
+player.style.left=lanes[lane]+"px";
+});
+
+// obstacle
+function createObstacle(){
+if(isGameOver) return;
+
+let o=document.createElement('div');
+o.className='obstacle';
+o.style.left=lanes[Math.floor(Math.random()*3)]+"px";
+o.style.top="-100px";
+container.appendChild(o);
+
+let move=setInterval(()=>{
+let top=parseInt(o.style.top);
+
+if(top>600){
+o.remove();
+clearInterval(move);
+score+=10;
+document.getElementById('score').innerText="Score: "+score;
+speed+=0.2;
+}else{
+o.style.top=(top+speed)+"px";
+}
+
+// collision
+let p=player.getBoundingClientRect();
+let r=o.getBoundingClientRect();
+
+if(p.left<r.left+r.width && p.left+p.width>r.left &&
+p.top<r.top+r.height && p.top+p.height>r.top){
+
+if(shield){
+o.remove();
+shield=false;
+}else{
+policeDist-=20;
+o.remove();
+}
+}
+
+// police follow
+police.style.left=player.style.left;
+policeDist-=0.03;
+police.style.bottom=(50-policeDist)+"px";
+
+if(policeDist<=0){
+gameOver();
+}
+
+},20);
+
+setTimeout(createObstacle,1000);
+}
+
+// coins
+function createCoin(){
+if(isGameOver) return;
+
+let c=document.createElement('div');
+c.className='coin';
+c.style.left=lanes[Math.floor(Math.random()*3)]+"px";
+c.style.top="-50px";
+container.appendChild(c);
+
+let move=setInterval(()=>{
+let top=parseInt(c.style.top);
+
+if(top>600){
+c.remove();
+clearInterval(move);
+}else{
+c.style.top=(top+speed)+"px";
+}
+
+let p=player.getBoundingClientRect();
+let r=c.getBoundingClientRect();
+
+if(p.left<r.left+r.width && p.left+p.width>r.left &&
+p.top<r.top+r.height && p.top+p.height>r.top){
+coins++;
+policeDist+=5;
+document.getElementById('coins').innerText="Coins: "+coins;
+c.remove();
+clearInterval(move);
+}
+
+},20);
+
+setTimeout(createCoin,1500);
+}
+
+// power
+function createPower(){
+if(isGameOver) return;
+
+let p=document.createElement('div');
+p.className='power';
+p.style.left=lanes[Math.floor(Math.random()*3)]+"px";
+p.style.top="-50px";
+container.appendChild(p);
+
+let move=setInterval(()=>{
+let top=parseInt(p.style.top);
+
+if(top>600){
+p.remove();
+clearInterval(move);
+}else{
+p.style.top=(top+speed)+"px";
+}
+
+let pl=player.getBoundingClientRect();
+let pr=p.getBoundingClientRect();
+
+if(pl.left<pr.left+pr.width && pl.left+pl.width>pr.left &&
+pl.top<pr.top+pr.height && pl.top+pl.height>pr.top){
+
+shield=true;
+player.style.opacity=0.5;
+
+setTimeout(()=>{
+shield=false;
+player.style.opacity=1;
+},5000);
+
+p.remove();
+clearInterval(move);
+}
+
+},20);
+
+setTimeout(createPower,5000);
+}
+
+// shop
+function buySkin(color,cost){
+if(coins>=cost){
+coins-=cost;
+player.style.background=color;
+}else alert("Not enough coins");
+}
+
+// game over
+function gameOver(){
+isGameOver=true;
+document.getElementById('game-over').style.display='block';
+document.getElementById('final-score').innerText="Score: "+score;
+
+let hs=localStorage.getItem("hs")||0;
+if(score>hs) localStorage.setItem("hs",score);
+document.getElementById('high-score').innerText="High Score: "+localStorage.getItem("hs");
+}
+
+// restart
+function restartGame(){
+location.reload();
+}
+</script>
+
+</body>
+</html>
